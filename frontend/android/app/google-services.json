@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1050212487500",
+    "project_id": "placement-analyzer-1a149",
+    "storage_bucket": "placement-analyzer-1a149.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1050212487500:android:d774a53fad1014439fffe9",
+        "android_client_info": {
+          "package_name": "com.example.placement_readiness_analyzer"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAMiwDQN9XZEcb47OVGEDN-hWbdLFpfuXI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
