@@ -69,4 +69,3 @@ The `PromiseJsImpl` error should now be resolved.
    # iOS
    flutter run -d ios
    ```
-

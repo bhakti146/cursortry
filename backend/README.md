@@ -98,4 +98,3 @@ All endpoints return appropriate HTTP status codes:
 - 500: Internal Server Error
 - 503: Service Unavailable (Firebase/Gemini not configured)
 
-

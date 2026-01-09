@@ -14,15 +14,46 @@ import json
 from datetime import datetime
 import uuid
 
-print(os.path.exists("F:/techcatalyst/cursortry/backend/.env"))
-
-
 # Load environment variables
-load_dotenv("F:/techcatalyst/cursortry/backend/.env", override=True)
-print("GEMINI_API_KEY from os.environ:", os.environ.get("APIKEY"))
+# Try to load from current directory first, then try absolute path for local development
+env_path = os.path.join(os.path.dirname(__file__), '.env')
+if os.path.exists(env_path):
+    load_dotenv(env_path, override=True)
+else:
+    # Fallback for local development with absolute path
+    local_env_path = os.path.join(os.path.dirname(__file__), '..', 'backend', '.env')
+    if os.path.exists(local_env_path):
+        load_dotenv(local_env_path, override=True)
+    else:
+        # In production, environment variables are usually set directly
+        load_dotenv(override=True)
 
 app = Flask(__name__)
-CORS(app)
+
+# Configure CORS for production
+# Allow requests from Firebase Hosting domains and localhost for development
+allowed_origins = [
+    "http://localhost:*",
+    "http://127.0.0.1:*",
+]
+
+# Add Firebase Hosting domains if provided via environment variable
+firebase_domain = os.getenv('FIREBASE_HOSTING_DOMAIN', '')
+if firebase_domain:
+    allowed_origins.extend([
+        f"https://{firebase_domain}",
+        f"https://{firebase_domain.replace('.web.app', '.firebaseapp.com')}",
+    ])
+
+# For production, allow all origins (you can restrict this later)
+# In production, you should set specific domains
+CORS(app, resources={
+    r"/*": {
+        "origins": "*",  # In production, replace with specific domains
+        "methods": ["GET", "POST", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization"]
+    }
+})
 
 # Initialize Gemini AI
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
@@ -73,13 +104,14 @@ SCORING METHODOLOGY:
 - CGPA (0-10 scale): 12% weight (academic performance indicator)
 - Attendance (0-100%): 8% weight (consistency and discipline)
 - Qualification: 5% weight (degree level and relevance)
-- DSA Practice Per Week: 15% weight (critical for technical interviews)
-- Internship Count: 12% weight (real-world experience and exposure)
+- DSA Practice Frequency: 15% weight (critical for technical interviews - Daily > Weekly > Monthly)
+- Internship Experience: 12% weight (real-world experience - longer duration and company relevance)
 - Mock Interview Score (0-10): 12% weight (interview readiness and communication)
 - Resume Completeness (0-100): 10% weight (presentation and documentation quality)
 - Hackathons: 8% weight (competitive programming, problem-solving, and innovation)
 - Technologies/Languages: 8% weight (technical skills and programming expertise)
 - Certifications: 10% weight (professional credentials and specialized expertise)
+- Projects: 8% weight (practical application, problem-solving, and portfolio development)
 
 READINESS LEVELS:
 - Low (0-50): Significant gaps identified, needs focused improvement
@@ -134,6 +166,7 @@ Personal Information:
 - Name: {student_data.get('name', 'N/A')}
 - Location: {student_data.get('location', 'N/A')}
 - College: {student_data.get('college', 'N/A')}
+- College Tier: {student_data.get('college_tier', 'N/A')}
 - Qualification: {student_data.get('qualification', 'N/A')}
 - Department: {student_data.get('department', 'N/A')}
 
@@ -145,20 +178,30 @@ Achievements:
 - Hackathons: {student_data.get('hackathons', 'None')}
 - Mastered Languages/Technologies: {student_data.get('technologies', 'None')}
 - Certifications: {student_data.get('certifications', 'None')}
+- Projects: {student_data.get('projects', 'None')}
 
 Skills & Experience:
-- DSA Practice Per Week: {student_data.get('dsa_practice', 0)} hours/problems
-- Internship Count: {student_data.get('internship_count', 0)}
+- DSA Practice Frequency: {student_data.get('dsa_practice_frequency', 'N/A')}
+- Internships: {len(student_data.get('internships', []))} internship(s)
+{chr(10).join([f"  - {internship.get('company', 'N/A')} ({internship.get('duration', 'N/A')})" for internship in student_data.get('internships', [])]) if student_data.get('internships') else "  - None"}
 - Mock Interview Score: {student_data.get('mock_interview_score', 0)}/10
 - Resume Completeness: {student_data.get('resume_score', 0)}/100
 
 Provide your analysis following the JSON format specified in the system prompt."""
 
+    # Check if model is available
+    if model is None:
+        raise Exception("Gemini API is not configured. Please check your API key.")
+    
     try:
         # Combine system prompt with user prompt
         full_prompt = f"{SYSTEM_PROMPT}\n\n{prompt}"
         
         response = model.generate_content(full_prompt)
+        
+        # Check if response is valid
+        if not response or not hasattr(response, 'text') or not response.text:
+            raise Exception("Empty response from Gemini API")
         
         # Extract JSON from response
         response_text = response.text.strip()
@@ -184,7 +227,23 @@ Provide your analysis following the JSON format specified in the system prompt."
     except json.JSONDecodeError as e:
         raise Exception(f"Failed to parse Gemini response as JSON: {e}")
     except Exception as e:
-        raise Exception(f"Gemini API error: {e}")
+        error_str = str(e)
+        # Handle quota exceeded errors specifically
+        if "429" in error_str or "quota" in error_str.lower() or "exceeded" in error_str.lower():
+            # Extract retry time if available
+            if "retry" in error_str.lower() or "seconds" in error_str.lower():
+                raise Exception("API quota exceeded. You've reached the daily limit. Please try again tomorrow or upgrade your API plan.")
+            else:
+                raise Exception("API quota exceeded. You've reached the daily limit (20 requests/day on free tier). Please try again tomorrow or upgrade your API plan.")
+        # Handle rate limit errors
+        elif "rate limit" in error_str.lower():
+            raise Exception("API rate limit exceeded. Please wait a moment and try again.")
+        # Handle API key errors
+        elif "api key" in error_str.lower() or "401" in error_str or "403" in error_str:
+            raise Exception("Invalid or missing Gemini API key. Please check your API configuration.")
+        # Generic error
+        else:
+            raise Exception(f"Gemini API error: {error_str}")
 
 def save_to_firebase(student_data, analysis_result):
     """
@@ -197,20 +256,27 @@ def save_to_firebase(student_data, analysis_result):
         # Create document with unique ID
         doc_id = str(uuid.uuid4())
         
+        # Get user_id from request data
+        user_id = student_data.get('user_id', '')
+        
         # Prepare document data
         document_data = {
+            'user_id': user_id,  # Link to user account
             'student_profile': {
                 'name': student_data.get('name', ''),
                 'location': student_data.get('location', ''),
                 'college': student_data.get('college', ''),
+                'college_tier': student_data.get('college_tier', ''),
                 'qualification': student_data.get('qualification', ''),
+                'department': student_data.get('department', ''),
                 'cgpa': student_data.get('cgpa', 0),
                 'attendance': student_data.get('attendance', 0),
                 'hackathons': student_data.get('hackathons', ''),
-                'courses': student_data.get('courses', ''),
+                'technologies': student_data.get('technologies', ''),
                 'certifications': student_data.get('certifications', ''),
-                'dsa_practice': student_data.get('dsa_practice', 0),
-                'internship_count': student_data.get('internship_count', 0),
+                'projects': student_data.get('projects', ''),
+                'dsa_practice_frequency': student_data.get('dsa_practice_frequency', 'N/A'),
+                'internships': student_data.get('internships', []),
                 'mock_interview_score': student_data.get('mock_interview_score', 0),
                 'resume_score': student_data.get('resume_score', 0)
             },
@@ -253,9 +319,10 @@ def analyze():
         data = request.get_json()
         
         # Validate required fields
-        required_fields = ['name', 'location', 'college', 'qualification', 'department', 'cgpa', 
-                          'attendance', 'hackathons', 'technologies', 'certifications',
-                          'dsa_practice', 'internship_count', 'mock_interview_score', 'resume_score']
+        required_fields = ['name', 'location', 'college', 'college_tier', 'qualification', 'department', 'cgpa', 
+                          'attendance', 'hackathons', 'technologies', 'certifications', 'projects',
+                          'dsa_practice_frequency', 'internships', 
+                          'mock_interview_score', 'resume_score']
         missing_fields = [field for field in required_fields if field not in data]
         if missing_fields:
             return jsonify({
@@ -267,10 +334,22 @@ def analyze():
             return jsonify({'error': 'Attendance must be between 0 and 100'}), 400
         if data.get('cgpa', 0) < 0 or data.get('cgpa', 0) > 10:
             return jsonify({'error': 'CGPA must be between 0 and 10'}), 400
-        if data.get('dsa_practice', 0) < 0:
-            return jsonify({'error': 'DSA practice must be non-negative'}), 400
-        if data.get('internship_count', 0) < 0:
-            return jsonify({'error': 'Internship count must be non-negative'}), 400
+        # Validate DSA frequency
+        valid_dsa_frequencies = ['Daily', 'Weekly', 'Monthly']
+        if 'dsa_practice_frequency' in data and data.get('dsa_practice_frequency') not in valid_dsa_frequencies:
+            return jsonify({'error': 'DSA practice frequency must be Daily, Weekly, or Monthly'}), 400
+        
+        # Validate internships
+        if 'internships' in data:
+            internships = data.get('internships', [])
+            if not isinstance(internships, list):
+                return jsonify({'error': 'Internships must be a list'}), 400
+            valid_durations = ['1 month', '3 months', '6 months', '1 year']
+            for internship in internships:
+                if not isinstance(internship, dict):
+                    return jsonify({'error': 'Each internship must be an object with company and duration'}), 400
+                if 'duration' in internship and internship.get('duration') not in valid_durations:
+                    return jsonify({'error': 'Internship duration must be 1 month, 3 months, 6 months, or 1 year'}), 400
         if data.get('mock_interview_score', 0) < 0 or data.get('mock_interview_score', 0) > 10:
             return jsonify({'error': 'Mock interview score must be between 0 and 10'}), 400
         if data.get('resume_score', 0) < 0 or data.get('resume_score', 0) > 100:
@@ -292,49 +371,109 @@ def analyze():
         return jsonify(response), 200
     
     except Exception as e:
+        error_message = str(e)
+        # Determine appropriate HTTP status code
+        status_code = 500
+        if "quota" in error_message.lower() or "exceeded" in error_message.lower():
+            status_code = 429  # Too Many Requests
+        elif "not configured" in error_message.lower() or "api key" in error_message.lower():
+            status_code = 503  # Service Unavailable
+        elif "Missing required" in error_message or "must be between" in error_message:
+            status_code = 400  # Bad Request
+        
+        print(f"Error in /analyze endpoint: {error_message}")
         return jsonify({
-            'error': str(e),
+            'error': error_message,
             'success': False
-        }), 500
+        }), status_code
 
-@app.route('/history/<student_id>', methods=['GET'])
-def get_history(student_id):
+@app.route('/user/<user_id>/analyses', methods=['GET'])
+def get_user_analyses(user_id):
     """
-    Retrieve analysis history for a student
-    Note: In production, implement proper authentication
+    Retrieve analysis history for a specific user
     """
     if not db:
         return jsonify({'error': 'Firebase not configured'}), 503
     
     try:
-        # Query Firestore for student analyses
-        # Note: This is a simplified version. In production, use proper student_id tracking
+        # Query Firestore for user's analyses
         analyses_ref = db.collection('student_analyses')
-        docs = analyses_ref.order_by('timestamp', direction=firestore.Query.DESCENDING).limit(10).stream()
         
-        history = []
+        # Try with order_by, fallback to without if index is missing
+        try:
+            docs = analyses_ref.where('user_id', '==', user_id)\
+                              .order_by('timestamp', direction=firestore.Query.DESCENDING)\
+                              .limit(50)\
+                              .stream()
+        except Exception as order_error:
+            print(f"Warning: Could not order by timestamp, fetching without order: {order_error}")
+            # Fallback: fetch without ordering
+            docs = analyses_ref.where('user_id', '==', user_id)\
+                              .limit(50)\
+                              .stream()
+        
+        analyses = []
         for doc in docs:
-            doc_data = doc.to_dict()
-            history.append({
-                'id': doc.id,
-                'timestamp': doc_data.get('timestamp'),
-                'readiness_score': doc_data.get('readiness_score'),
-                'readiness_level': doc_data.get('readiness_level')
-            })
+            try:
+                doc_data = doc.to_dict()
+                
+                # Handle timestamp conversion
+                timestamp = doc_data.get('timestamp')
+                if timestamp is None:
+                    timestamp_str = datetime.now().isoformat()
+                elif isinstance(timestamp, str):
+                    timestamp_str = timestamp
+                elif hasattr(timestamp, 'isoformat'):
+                    timestamp_str = timestamp.isoformat()
+                else:
+                    timestamp_str = str(timestamp)
+                
+                # Ensure readiness_score is a number (convert to int if float)
+                readiness_score = doc_data.get('readiness_score', 0)
+                if isinstance(readiness_score, float):
+                    readiness_score = int(readiness_score)
+                
+                analyses.append({
+                    'id': doc.id,
+                    'timestamp': timestamp_str,
+                    'readiness_score': readiness_score,
+                    'readiness_level': doc_data.get('readiness_level', 'Low'),
+                    'analysis': doc_data.get('analysis'),  # Include full analysis
+                    'student_profile': doc_data.get('student_profile', {})
+                })
+            except Exception as doc_error:
+                print(f"Error processing document {doc.id}: {doc_error}")
+                continue
+        
+        # Sort in Python if order_by failed
+        if len(analyses) > 1:
+            try:
+                analyses.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+            except:
+                pass
         
         return jsonify({
             'success': True,
-            'history': history
+            'analyses': analyses
         }), 200
     
     except Exception as e:
+        print(f"Error fetching user analyses: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({
             'error': str(e),
             'success': False
         }), 500
 
 if __name__ == '__main__':
+    # For local development
     port = int(os.getenv('FLASK_PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=True)
+    debug_mode = os.getenv('FLASK_ENV', 'development') == 'development'
+    app.run(host='0.0.0.0', port=port, debug=debug_mode)
+else:
+    # For production with Gunicorn
+    # Gunicorn will handle the server
+    pass
 
 

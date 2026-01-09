@@ -37,17 +37,37 @@ class _RegisterScreenState extends State<RegisterScreen> {
       _errorMessage = null;
     });
 
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final success = await authProvider.signUp(
-      email: _emailController.text.trim(),
-      password: _passwordController.text,
-      name: _nameController.text.trim(),
-    );
+    try {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final success = await authProvider.signUp(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+        name: _nameController.text.trim(),
+      );
 
-    if (!success && mounted) {
-      setState(() {
-        _errorMessage = 'Registration failed. Email may already be in use.';
-      });
+      if (success && mounted) {
+        // Wait for auth state to update in the provider
+        await Future.delayed(const Duration(milliseconds: 200));
+        
+        // Pop back to the root (AuthWrapper) so it can rebuild and show dashboard
+        if (mounted) {
+          if (Navigator.canPop(context)) {
+            Navigator.popUntil(context, (route) => route.isFirst);
+          }
+          // The AuthWrapper will automatically detect the auth state change
+          // and show the dashboard instead of the login screen
+        }
+      } else if (!success && mounted) {
+        setState(() {
+          _errorMessage = 'Registration failed. Email may already be in use.';
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'An error occurred: $e';
+        });
+      }
     }
   }
 

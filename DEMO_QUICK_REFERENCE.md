@@ -163,4 +163,3 @@ Resume: 60
 
 **Pro Tip**: Practice the demo once before presenting. Have the backend and Firebase console ready in separate tabs.
 
-

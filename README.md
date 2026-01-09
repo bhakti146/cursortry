@@ -379,4 +379,3 @@ For issues or questions, please refer to the documentation or create an issue in
 
 **Built with ❤️ for ethical AI in education**
 
-

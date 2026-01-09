@@ -147,4 +147,3 @@ This shows verbose output with detailed error messages.
 2. Check `flutter doctor` output
 3. Verify Firebase project is set up correctly
 4. Try running on a different platform (web, if available)
-

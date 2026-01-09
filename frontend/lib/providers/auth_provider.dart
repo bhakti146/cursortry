@@ -66,18 +66,45 @@ class AuthProvider with ChangeNotifier {
       );
 
       if (result['success'] == true) {
-        // Set user immediately for instant navigation
-        _user = result['user'] as User?;
+        // Wait a moment for Firebase Auth to fully update
+        await Future.delayed(const Duration(milliseconds: 100));
+        
+        // Get the user from Firebase Auth directly to ensure it's current
+        _user = _authService.currentUser;
+        
+        // Fallback to result user if currentUser is still null
+        if (_user == null) {
+          _user = result['user'] as User?;
+        }
+        
+        // Ensure we have a user before proceeding
+        if (_user == null) {
+          print('Warning: User is null after signup');
+          _isLoading = false;
+          notifyListeners();
+          return false;
+        }
+        
         _isLoading = false;
+        
+        // Force immediate notification - this should trigger AuthWrapper rebuild
+        print('Sign up successful - User: ${_user?.email}, notifying listeners...');
         notifyListeners();
+        
+        // Wait another tiny bit to ensure the notification is processed
+        await Future.delayed(const Duration(milliseconds: 50));
         
         // Load profile in background (non-blocking)
         _loadUserProfile();
+        
+        // Final notification to ensure UI is updated
+        notifyListeners();
         
         return true;
       } else {
         _isLoading = false;
         notifyListeners();
+        print('Sign up failed: ${result['error']}');
         return false;
       }
     } catch (e) {

@@ -285,4 +285,3 @@ Local Machine
 
 **Note**: This architecture is designed for hackathon/demo purposes. Production deployment requires additional security, monitoring, and scaling considerations.
 
-

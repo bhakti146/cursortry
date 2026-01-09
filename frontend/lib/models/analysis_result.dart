@@ -22,8 +22,20 @@ class AnalysisResult {
   });
 
   factory AnalysisResult.fromJson(Map<String, dynamic> json) {
+    // Handle readiness_score which might be int, double, or null
+    int score = 0;
+    if (json['readiness_score'] != null) {
+      if (json['readiness_score'] is int) {
+        score = json['readiness_score'] as int;
+      } else if (json['readiness_score'] is double) {
+        score = (json['readiness_score'] as double).round();
+      } else {
+        score = int.tryParse(json['readiness_score'].toString()) ?? 0;
+      }
+    }
+    
     return AnalysisResult(
-      readinessScore: json['readiness_score'] ?? 0,
+      readinessScore: score,
       readinessLevel: json['readiness_level'] ?? 'Low',
       summary: json['summary'] ?? '',
       strengths: List<String>.from(json['strengths'] ?? []),

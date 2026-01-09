@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 import 'firebase_options.dart';
-import 'providers/auth_provider.dart';
+import 'providers/auth_provider.dart' as app_auth;
 import 'screens/auth/login_screen.dart';
 import 'widgets/dashboard_layout.dart';
 
@@ -22,7 +23,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
-      create: (_) => AuthProvider(),
+      create: (_) => app_auth.AuthProvider(),
       child: MaterialApp(
         title: 'SkillGap AI',
         debugShowCheckedModeBanner: false,
@@ -58,16 +59,19 @@ class AuthWrapper extends StatefulWidget {
 class _AuthWrapperState extends State<AuthWrapper> {
   @override
   Widget build(BuildContext context) {
-    return Consumer<AuthProvider>(
+    return Consumer<app_auth.AuthProvider>(
       builder: (context, authProvider, _) {
+        // Get the user from provider, or fallback to Firebase Auth directly
+        final user = authProvider.user ?? FirebaseAuth.instance.currentUser;
+        
         // Debug: Print auth state
-        if (authProvider.user != null) {
-          print('AuthWrapper: User is authenticated - ${authProvider.user?.email}');
+        if (user != null) {
+          print('AuthWrapper: User is authenticated - ${user.email}');
         } else {
           print('AuthWrapper: User is not authenticated');
         }
 
-        // Show loading while checking auth state
+        // Show loading while checking auth state OR during signup/signin
         if (authProvider.isLoading) {
           print('AuthWrapper: Loading...');
           return const Scaffold(
@@ -78,9 +82,10 @@ class _AuthWrapperState extends State<AuthWrapper> {
         }
 
         // If authenticated, show dashboard
-        if (authProvider.isAuthenticated) {
-          print('AuthWrapper: Showing dashboard');
-          return const DashboardLayout();
+        if (user != null) {
+          print('AuthWrapper: Showing dashboard for ${user.email}');
+          // Use user ID as key to force recreation when user changes
+          return DashboardLayout(key: ValueKey(user.uid));
         }
 
         // If not authenticated, show login

@@ -252,4 +252,3 @@ When testing, verify:
 - ✅ No company names or hiring guarantees mentioned
 - ✅ Analysis is constructive and encouraging
 
-

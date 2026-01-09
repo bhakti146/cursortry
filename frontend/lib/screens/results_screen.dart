@@ -40,37 +40,67 @@ class ResultsScreen extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 32),
-                // Score and Summary Row
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      flex: 2,
-                      child: _buildScoreCard(context),
-                    ),
-                    const SizedBox(width: 24),
-                    Expanded(
-                      flex: 3,
-                      child: _buildSummaryCard(context),
-                    ),
-                  ],
+                // Score and Summary Row (responsive)
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isWide = constraints.maxWidth > 900;
+                    if (isWide) {
+                      return Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            flex: 2,
+                            child: _buildScoreCard(context),
+                          ),
+                          const SizedBox(width: 24),
+                          Expanded(
+                            flex: 3,
+                            child: _buildSummaryCard(context),
+                          ),
+                        ],
+                      );
+                    }
+                    return Column(
+                      children: [
+                        _buildScoreCard(context),
+                        const SizedBox(height: 16),
+                        _buildSummaryCard(context),
+                      ],
+                    );
+                  },
                 ),
                 const SizedBox(height: 32),
-                // Insight Cards Row
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildWeakAreasCard(context),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: _buildStrengthsCard(context),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: _buildRiskFactorsCard(context),
-                    ),
-                  ],
+                // Insight Cards Row (responsive)
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isWide = constraints.maxWidth > 900;
+                    if (isWide) {
+                      return Row(
+                        children: [
+                          Expanded(
+                            child: _buildWeakAreasCard(context),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: _buildStrengthsCard(context),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: _buildRiskFactorsCard(context),
+                          ),
+                        ],
+                      );
+                    }
+                    return Column(
+                      children: [
+                        _buildWeakAreasCard(context),
+                        const SizedBox(height: 12),
+                        _buildStrengthsCard(context),
+                        const SizedBox(height: 12),
+                        _buildRiskFactorsCard(context),
+                      ],
+                    );
+                  },
                 ),
                 const SizedBox(height: 32),
                 // Recommendations

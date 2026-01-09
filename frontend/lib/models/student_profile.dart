@@ -3,6 +3,7 @@ class StudentProfile {
   final String name;
   final String location;
   final String college;
+  final String collegeTier;
   final String qualification;
   final String department;
   
@@ -14,10 +15,11 @@ class StudentProfile {
   final String hackathons;
   final String technologies;
   final String certifications;
+  final String projects;
   
   // Skills & Experience
-  final double dsaPractice;
-  final int internshipCount;
+  final String dsaPracticeFrequency; // daily, weekly, monthly
+  final List<Map<String, String>> internships; // List of {company, duration}
   final double mockInterviewScore;
   final double resumeScore;
 
@@ -25,6 +27,7 @@ class StudentProfile {
     required this.name,
     required this.location,
     required this.college,
+    required this.collegeTier,
     required this.qualification,
     required this.department,
     required this.cgpa,
@@ -32,8 +35,9 @@ class StudentProfile {
     required this.hackathons,
     required this.technologies,
     required this.certifications,
-    required this.dsaPractice,
-    required this.internshipCount,
+    required this.projects,
+    required this.dsaPracticeFrequency,
+    required this.internships,
     required this.mockInterviewScore,
     required this.resumeScore,
   });
@@ -43,6 +47,7 @@ class StudentProfile {
       'name': name,
       'location': location,
       'college': college,
+      'college_tier': collegeTier,
       'qualification': qualification,
       'department': department,
       'cgpa': cgpa,
@@ -50,8 +55,9 @@ class StudentProfile {
       'hackathons': hackathons,
       'technologies': technologies,
       'certifications': certifications,
-      'dsa_practice': dsaPractice,
-      'internship_count': internshipCount,
+      'projects': projects,
+      'dsa_practice_frequency': dsaPracticeFrequency,
+      'internships': internships,
       'mock_interview_score': mockInterviewScore,
       'resume_score': resumeScore,
     };
